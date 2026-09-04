@@ -62,10 +62,16 @@ const getCase = asyncHandler(async (req, res) => {
 // Runs AI understanding, duplicate detection, and department routing in one
 // orchestrated flow, mirroring the master-spec citizen workflow.
 const createCase = asyncHandler(async (req, res) => {
-  const { description, city, ward, location, severityOverride, mediaType, locationTags } = req.body;
+  const { description, city, ward, location, severityOverride, mediaType, locationTags, photoDataUrl } = req.body;
 
   if (!description || !city || !location) {
     return res.status(400).json({ error: 'A description, city, and location are required to submit a request.' });
+  }
+
+  // A citizen-attached photo is capped generously here; real deployments
+  // would store this in object storage (S3/GCS) and save only the URL.
+  if (photoDataUrl && photoDataUrl.length > 6_000_000) {
+    return res.status(413).json({ error: 'That photo is too large. Please attach a smaller image.' });
   }
 
   const analysis = classifyRequest({ description, locationTags });
@@ -94,7 +100,11 @@ const createCase = asyncHandler(async (req, res) => {
       relatedCases: 0,
       isMockAnalysis: true
     },
-    evidence: mediaType ? [{ type: mediaType, url: null, stage: 'general' }] : []
+    evidence: photoDataUrl
+      ? [{ type: 'photo', url: photoDataUrl, stage: 'before', uploadedAt: new Date().toISOString() }]
+      : mediaType
+      ? [{ type: mediaType, url: null, stage: 'general' }]
+      : []
   };
 
   // Duplicate intelligence: does this match an existing open cluster?

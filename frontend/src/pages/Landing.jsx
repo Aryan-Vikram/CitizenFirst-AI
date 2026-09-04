@@ -39,8 +39,8 @@ export default function Landing() {
               SIH 2026 · PS ID SIH26129 · Govt. of Maharashtra
             </span>
             <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-ink leading-[1.08]">
-              Namaste! Report and track civic issues.
-              <span className="block text-primary">All in one place.</span>
+              One citizen. One request.
+              <span className="block text-primary">One connected government.</span>
             </h1>
             <p className="mt-5 text-lg text-ink-soft leading-relaxed max-w-xl">
               CitizenFirst AI reads what you write, understands the issue, and routes it to the right

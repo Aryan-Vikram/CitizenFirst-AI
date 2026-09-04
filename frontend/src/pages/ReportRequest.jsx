@@ -1,12 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Mic, MapPin, ArrowRight, ArrowLeft, School, Building, Route as RoadIcon, Home, Loader2 } from 'lucide-react';
+import {
+  Mic, MapPin, ArrowRight, ArrowLeft, School, Building, Route as RoadIcon, Home, Loader2,
+  Camera, ImagePlus, X, ScanEye
+} from 'lucide-react';
 import ProgressSteps from '../components/ProgressSteps.jsx';
 import AIAnalysisCard from '../components/AIAnalysisCard.jsx';
 import MapView from '../components/MapView.jsx';
 import { aiService } from '../services/ai.js';
 import { casesService } from '../services/cases.js';
 import { useApp } from '../context/AppContext.jsx';
+import { readAndCompressImage } from '../utils/image.js';
 
 const STEPS = ['Describe', 'AI Understanding', 'Location', 'Review & Submit'];
 
@@ -37,8 +41,38 @@ export default function ReportRequest() {
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
+  const [photoDataUrl, setPhotoDataUrl] = useState(null);
+  const [photoAnalysis, setPhotoAnalysis] = useState(null);
+  const [photoProcessing, setPhotoProcessing] = useState(false);
+  const cameraInputRef = useRef(null);
+  const fileInputRef = useRef(null);
   const { pushToast } = useApp();
   const navigate = useNavigate();
+
+  async function handlePhotoSelected(e) {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // allow re-selecting the same file later
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setError('Please choose an image file.');
+      return;
+    }
+    setError('');
+    setPhotoProcessing(true);
+    try {
+      const dataUrl = await readAndCompressImage(file);
+      setPhotoDataUrl(dataUrl);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setPhotoProcessing(false);
+    }
+  }
+
+  function removePhoto() {
+    setPhotoDataUrl(null);
+    setPhotoAnalysis(null);
+  }
 
   async function runAnalysis() {
     if (description.trim().length < 5) {
@@ -50,6 +84,14 @@ export default function ReportRequest() {
     try {
       const data = await aiService.analyzeText(description, locationTags);
       setAnalysis(data);
+      if (photoDataUrl) {
+        try {
+          const imgResult = await aiService.analyzeImage(data.issueType);
+          setPhotoAnalysis(imgResult);
+        } catch (imgErr) {
+          // Photo analysis is a bonus signal — don't block the flow if it fails.
+        }
+      }
       setStep(1);
     } catch (err) {
       setError(err.message);
@@ -72,7 +114,7 @@ export default function ReportRequest() {
         ward,
         location,
         locationTags,
-        mediaType: null
+        photoDataUrl: photoDataUrl || null
       });
       setResult(data);
       pushToast(data.duplicate ? 'Consolidated into an existing report.' : 'Request submitted successfully.', 'success');
@@ -117,7 +159,7 @@ export default function ReportRequest() {
             Track this case
           </button>
           <button
-            onClick={() => { setResult(null); setStep(0); setDescription(''); setAnalysis(null); }}
+            onClick={() => { setResult(null); setStep(0); setDescription(''); setAnalysis(null); setPhotoDataUrl(null); setPhotoAnalysis(null); }}
             className="px-5 py-3 rounded-md border border-border text-ink text-sm font-semibold hover:bg-bg-subtle"
           >
             Report another issue
@@ -161,6 +203,61 @@ export default function ReportRequest() {
           </div>
 
           <div>
+            <label className="block text-sm font-medium text-ink mb-2">Add a photo (optional, but helps a lot)</label>
+
+            {/* Hidden inputs: one opens the camera directly on mobile, one opens the file picker */}
+            <input
+              ref={cameraInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={handlePhotoSelected}
+              className="hidden"
+            />
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handlePhotoSelected}
+              className="hidden"
+            />
+
+            {!photoDataUrl ? (
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => cameraInputRef.current?.click()}
+                  disabled={photoProcessing}
+                  className="flex items-center justify-center gap-2 px-3 py-3 rounded-md border border-dashed border-border text-sm text-ink-soft hover:border-primary/50 hover:text-primary disabled:opacity-60"
+                >
+                  <Camera size={16} /> Take photo
+                </button>
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={photoProcessing}
+                  className="flex items-center justify-center gap-2 px-3 py-3 rounded-md border border-dashed border-border text-sm text-ink-soft hover:border-primary/50 hover:text-primary disabled:opacity-60"
+                >
+                  {photoProcessing ? <Loader2 size={16} className="animate-spin" /> : <ImagePlus size={16} />} Upload photo
+                </button>
+              </div>
+            ) : (
+              <div className="relative inline-block">
+                <img src={photoDataUrl} alt="Attached evidence" className="h-40 w-full sm:w-auto rounded-md border border-border object-cover" />
+                <button
+                  type="button"
+                  onClick={removePhoto}
+                  aria-label="Remove photo"
+                  className="absolute -top-2 -right-2 h-7 w-7 flex items-center justify-center rounded-full bg-critical text-white shadow-panel"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            )}
+            <p className="mt-1.5 text-xs text-ink-faint">On a phone, "Take photo" opens your camera directly.</p>
+          </div>
+
+          <div>
             <label className="block text-sm font-medium text-ink mb-2">Does this location have extra context?</label>
             <div className="grid grid-cols-2 gap-2">
               {LOCATION_TAGS.map(({ key, label, icon: Icon }) => (
@@ -193,6 +290,44 @@ export default function ReportRequest() {
       {step === 1 && analysis && (
         <div className="space-y-5">
           <AIAnalysisCard analysis={analysis} />
+
+          {photoDataUrl && (
+            <div className="rounded-card border border-teal/25 bg-teal-soft/40 p-5">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-teal text-white">
+                  <ScanEye size={14} />
+                </span>
+                <h3 className="text-sm font-semibold text-ink">Photo Analysis</h3>
+                <span className="ml-auto text-[11px] text-ink-faint border border-border rounded px-1.5 py-0.5">Prototype AI</span>
+              </div>
+              <div className="flex gap-4">
+                <img src={photoDataUrl} alt="Attached evidence" className="h-24 w-24 rounded-md object-cover border border-border shrink-0" />
+                {photoAnalysis ? (
+                  <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-sm flex-1">
+                    <div>
+                      <dt className="text-xs text-ink-faint">Detected</dt>
+                      <dd className="font-semibold text-ink">{photoAnalysis.detected}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs text-ink-faint">Confidence</dt>
+                      <dd className="font-semibold text-ink">{Math.round(photoAnalysis.confidence * 100)}%</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs text-ink-faint">Visual severity</dt>
+                      <dd className="font-semibold text-ink">{photoAnalysis.potentialImpact}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs text-ink-faint">Related cases nearby</dt>
+                      <dd className="font-semibold text-ink">{photoAnalysis.relatedCases}</dd>
+                    </div>
+                  </dl>
+                ) : (
+                  <p className="text-sm text-ink-soft flex-1">Photo attached — visual analysis wasn't available this time, but your photo will still be attached to the case.</p>
+                )}
+              </div>
+            </div>
+          )}
+
           <div className="flex gap-3">
             <button onClick={() => setStep(0)} className="flex-1 inline-flex items-center justify-center gap-1.5 px-5 py-3 rounded-md border border-border text-ink text-sm font-semibold hover:bg-bg-subtle">
               <ArrowLeft size={15} /> Edit description
@@ -255,6 +390,9 @@ export default function ReportRequest() {
       {step === 3 && (
         <div className="space-y-5">
           <div className="rounded-card border border-border bg-bg p-5 space-y-3 text-sm">
+            {photoDataUrl && (
+              <img src={photoDataUrl} alt="Attached evidence" className="h-32 w-full object-cover rounded-md border border-border mb-1" />
+            )}
             <SummaryRow label="Description" value={description} />
             <SummaryRow label="Detected issue" value={analysis?.issueLabel} />
             <SummaryRow label="Location" value={`${city}${ward ? `, ${ward}` : ''}`} />

@@ -20,12 +20,14 @@ const NAV_BY_ROLE = {
     { to: '/report', label: 'Report a Request', icon: FilePlus2 },
     { to: '/my-requests', label: 'My Requests', icon: ListChecks },
     { to: '/gis', label: 'GIS Intelligence', icon: Map },
+    { to: '/analytics', label: 'City Stats', icon: BarChart3 },
     { to: '/notifications', label: 'Notifications', icon: Bell },
     { to: '/profile', label: 'Profile & Accessibility', icon: Settings }
   ],
   field_officer: [
     { to: '/officer', label: 'Assigned Cases', icon: ListChecks },
     { to: '/gis', label: 'GIS Intelligence', icon: Map },
+    { to: '/analytics', label: 'Analytics', icon: BarChart3 },
     { to: '/notifications', label: 'Notifications', icon: Bell },
     { to: '/profile', label: 'Profile & Accessibility', icon: Settings }
   ],

@@ -16,7 +16,7 @@ const analyticsRoutes = require('./routes/analyticsRoutes');
 const app = express();
 
 app.use(cors({ origin: process.env.FRONTEND_ORIGIN || '*' }));
-app.use(express.json({ limit: '5mb' }));
+app.use(express.json({ limit: '10mb' }));
 app.use(morgan('dev'));
 
 app.get('/api/health', (req, res) => {

@@ -1,6 +1,6 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { MapPin, Users, Clock, ThumbsUp, ThumbsDown, MessageCircle } from 'lucide-react';
+import { MapPin, Users, Clock, ThumbsUp, ThumbsDown, MessageCircle, Camera, Loader2, Images } from 'lucide-react';
 import CaseTimeline from '../components/CaseTimeline.jsx';
 import PriorityScoreCard from '../components/PriorityScoreCard.jsx';
 import { DepartmentBadge, PriorityBadge } from '../components/PriorityBadge.jsx';
@@ -10,6 +10,7 @@ import { casesService } from '../services/cases.js';
 import { formatDate } from '../utils/format.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useApp } from '../context/AppContext.jsx';
+import { readAndCompressImage } from '../utils/image.js';
 
 export default function CaseDetails() {
   const { caseId } = useParams();
@@ -48,6 +49,30 @@ export default function CaseDetails() {
 
   const isOfficerRole = user && ['field_officer', 'department_admin', 'government_admin'].includes(user.role);
   const [statusUpdating, setStatusUpdating] = useState(false);
+  const [uploadingEvidence, setUploadingEvidence] = useState(false);
+  const evidenceInputRef = useRef(null);
+
+  async function handleEvidenceUpload(e) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      pushToast('Please choose an image file.', 'error');
+      return;
+    }
+    setUploadingEvidence(true);
+    try {
+      const dataUrl = await readAndCompressImage(file);
+      const stage = record.status === 'Resolution Submitted' || record.status === 'AI Verification' ? 'after' : 'before';
+      const data = await casesService.addEvidence(caseId, { type: 'photo', url: dataUrl, stage });
+      setRecord(data.case);
+      pushToast('Photo attached to case.', 'success');
+    } catch (err) {
+      pushToast(err.message, 'error');
+    } finally {
+      setUploadingEvidence(false);
+    }
+  }
 
   const NEXT_STATUS = {
     Routed: 'Department Accepted',
@@ -117,6 +142,41 @@ export default function CaseDetails() {
               <CaseTimeline status={record.status} timeline={record.timeline} />
             </div>
           </section>
+
+          {record.evidence?.length > 0 && (
+            <section>
+              <h2 className="text-sm font-semibold text-ink mb-4 flex items-center gap-1.5">
+                <Images size={15} /> Photo evidence
+              </h2>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {record.evidence.filter((ev) => ev.type === 'photo' && ev.url).map((ev, i) => (
+                  <div key={i} className="rounded-md overflow-hidden border border-border">
+                    <img src={ev.url} alt={`${ev.stage} evidence`} className="h-32 w-full object-cover" />
+                    <div className="px-2 py-1 bg-bg-subtle text-[11px] text-ink-soft capitalize">{ev.stage}</div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {isOfficerRole && (
+            <section className="rounded-card border border-border bg-bg p-5">
+              <h2 className="text-sm font-semibold text-ink mb-1">Attach evidence photo</h2>
+              <p className="text-xs text-ink-soft mb-3">
+                Upload a "before" photo during inspection, or an "after" photo once work is complete.
+              </p>
+              <input ref={evidenceInputRef} type="file" accept="image/*" capture="environment" onChange={handleEvidenceUpload} className="hidden" />
+              <div className="flex gap-2">
+                <button
+                  onClick={() => evidenceInputRef.current?.click()}
+                  disabled={uploadingEvidence}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md border border-border text-sm text-ink-soft hover:border-primary/50 hover:text-primary disabled:opacity-60"
+                >
+                  {uploadingEvidence ? <Loader2 size={15} className="animate-spin" /> : <Camera size={15} />} Take / upload photo
+                </button>
+              </div>
+            </section>
+          )}
 
           <section>
             <h2 className="text-sm font-semibold text-ink mb-4">Location</h2>

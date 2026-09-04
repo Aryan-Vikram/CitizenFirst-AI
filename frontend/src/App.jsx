@@ -79,7 +79,7 @@ export default function App() {
 
         {/* Shared authenticated */}
         <Route path="/gis" element={<ProtectedRoute><AppLayout><GISIntelligence /></AppLayout></ProtectedRoute>} />
-        <Route path="/analytics" element={<ProtectedRoute roles={['department_admin', 'government_admin']}><AppLayout><Analytics /></AppLayout></ProtectedRoute>} />
+        <Route path="/analytics" element={<ProtectedRoute><AppLayout><Analytics /></AppLayout></ProtectedRoute>} />
         <Route path="/notifications" element={<ProtectedRoute><AppLayout><Notifications /></AppLayout></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute><AppLayout><Profile /></AppLayout></ProtectedRoute>} />
 
