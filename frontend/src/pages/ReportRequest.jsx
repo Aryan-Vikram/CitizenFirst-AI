@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Mic, MapPin, ArrowRight, ArrowLeft, School, Building, Route as RoadIcon, Home, Loader2,
-  Camera, ImagePlus, X, ScanEye
+  Camera, ImagePlus, X, ScanEye, Send
 } from 'lucide-react';
 import ProgressSteps from '../components/ProgressSteps.jsx';
 import AIAnalysisCard from '../components/AIAnalysisCard.jsx';
@@ -11,6 +11,7 @@ import { aiService } from '../services/ai.js';
 import { casesService } from '../services/cases.js';
 import { useApp } from '../context/AppContext.jsx';
 import { readAndCompressImage } from '../utils/image.js';
+import { DEPARTMENT_NAMES } from '../utils/priorityScore.js';
 
 const STEPS = ['Describe', 'AI Understanding', 'Location', 'Review & Submit'];
 
@@ -51,7 +52,7 @@ export default function ReportRequest() {
 
   async function handlePhotoSelected(e) {
     const file = e.target.files?.[0];
-    e.target.value = ''; // allow re-selecting the same file later
+    e.target.value = '';
     if (!file) return;
     if (!file.type.startsWith('image/')) {
       setError('Please choose an image file.');
@@ -205,7 +206,6 @@ export default function ReportRequest() {
           <div>
             <label className="block text-sm font-medium text-ink mb-2">Add a photo (optional, but helps a lot)</label>
 
-            {/* Hidden inputs: one opens the camera directly on mobile, one opens the file picker */}
             <input
               ref={cameraInputRef}
               type="file"
@@ -298,7 +298,9 @@ export default function ReportRequest() {
                   <ScanEye size={14} />
                 </span>
                 <h3 className="text-sm font-semibold text-ink">Photo Analysis</h3>
-                <span className="ml-auto text-[11px] text-ink-faint border border-border rounded px-1.5 py-0.5">Prototype AI</span>
+                <span className="ml-auto text-[11px] text-ink-faint border border-border rounded px-1.5 py-0.5">
+                  Prototype AI
+                </span>
               </div>
               <div className="flex gap-4">
                 <img src={photoDataUrl} alt="Attached evidence" className="h-24 w-24 rounded-md object-cover border border-border shrink-0" />
@@ -325,6 +327,18 @@ export default function ReportRequest() {
                   <p className="text-sm text-ink-soft flex-1">Photo attached — visual analysis wasn't available this time, but your photo will still be attached to the case.</p>
                 )}
               </div>
+              {analysis?.departments?.length > 0 && (
+                <div className="mt-4 pt-4 border-t border-teal/20 flex items-start gap-2">
+                  <Send size={14} className="text-teal shrink-0 mt-0.5" />
+                  <p className="text-xs text-ink-soft">
+                    This photo will be sent along with your report to{' '}
+                    <span className="font-semibold text-ink">
+                      {analysis.departments.map((code) => DEPARTMENT_NAMES[code] || code).join(' and ')}
+                    </span>
+                    {analysis.departments.length > 1 ? ' — both departments will see it.' : ' as evidence.'}
+                  </p>
+                </div>
+              )}
             </div>
           )}
 
